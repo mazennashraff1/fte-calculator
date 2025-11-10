@@ -1,7 +1,7 @@
 import pandas as pd
 from PIL import Image
 import streamlit as st
-from fte_logic import compute_fte
+from fte_logic import compute_fte, convert_df
 
 # --- Page config ---
 st.set_page_config(
@@ -64,14 +64,6 @@ with tab_home:
                 use_container_width=True,
             )
             st.metric("✅ Total University FTE", f"{st.session_state['total_fte']:.2f}")
-
-            def convert_df(df):
-                import io
-
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                    df.to_excel(writer, index=False, sheet_name="Sheet1")
-                return output.getvalue()
 
             fte_groups_excel = convert_df(st.session_state["fte_groups"])
             st.download_button(

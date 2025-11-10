@@ -1,3 +1,4 @@
+import io
 import pandas as pd
 
 
@@ -25,3 +26,10 @@ def compute_fte(load_standard: pd.DataFrame, staff_loads: pd.DataFrame):
     total_university_fte = fte_groups["Weighted_FTE"].sum()
 
     return merged, fte_groups, total_university_fte
+
+
+def convert_df(df):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Sheet1")
+    return output.getvalue()
