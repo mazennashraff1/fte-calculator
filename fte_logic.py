@@ -2,30 +2,40 @@ import io
 import pandas as pd
 
 
-def calculate_fte_ratio(row):
-    job = str(row["JOB_TITLE_CODE"]).strip().lower()
-    if "teaching assistant" in job:
-        return 0.5
-    max_load = row.get("MAX_LOAD", 0)
-    if pd.isna(max_load) or max_load == 0:
+def calculate_fte(row):
+    """
+    FTE rules from slide:
+    - Only staff with teaching load are counted
+    - Full Time = 1
+    - Part Time = 1 / 3
+    """
+
+    load = row.get("load", 0)
+
+    # Exclude staff with no teaching load
+    if pd.isna(load) or load <= 0:
         return 0
-    return round(row["CURRENT_LOAD"] / max_load, 2)
+
+    contract = str(row["Contract Type"]).lower().strip()
+
+    if "Full Time" in contract:
+        return 1.0
+    elif "Part Time" in contract:
+        return round(1 / 3, 3)
+
+    return 0
 
 
-def compute_fte(load_standard: pd.DataFrame, staff_loads: pd.DataFrame):
-    merged = pd.merge(
-        staff_loads,
-        load_standard,
-        on=["FACULTYID", "JOB_TITLE_CODE"],
-        how="left",
-    )
-    merged["FTE_Ratio"] = merged.apply(calculate_fte_ratio, axis=1)
+def compute_fte(staff_df: pd.DataFrame):
+    staff_df["FTE"] = staff_df.apply(calculate_fte, axis=1)
 
-    fte_groups = merged.groupby("FTE_Ratio").size().reset_index(name="Headcount")
-    fte_groups["Weighted_FTE"] = fte_groups["Headcount"] * fte_groups["FTE_Ratio"]
-    total_university_fte = fte_groups["Weighted_FTE"].sum()
+    fte_summary = staff_df.groupby("FTE").size().reset_index(name="Headcount")
 
-    return merged, fte_groups, total_university_fte
+    fte_summary["Weighted_FTE"] = fte_summary["FTE"] * fte_summary["Headcount"]
+
+    total_university_fte = fte_summary["Weighted_FTE"].sum()
+
+    return staff_df, fte_summary, total_university_fte
 
 
 def convert_df(df):

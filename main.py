@@ -15,7 +15,7 @@ logo = Image.open("MSA_Logo.png")
 
 col1, col2, col3 = st.columns([1, 4, 1])
 with col1:
-    st.image(logo, width=80)  # small logo at left
+    st.image(logo, width=80)
 
 with col2:
     st.markdown(
@@ -24,99 +24,120 @@ with col2:
     )
 
 with col3:
-    st.write("")  # empty to center title
+    st.write("")
 
-# --- Top-level tabs for pages ---
+# --- Top-level tabs ---
 tab_home, tab_templates = st.tabs(["🏠 Home", "📄 Excel Templates"])
 
 # --- Home Tab ---
 with tab_home:
-    st.subheader("Upload Excel Files")
-    load_standard_file = st.file_uploader(
-        "Upload Standard Load for the University", type=["xlsx"]
-    )
-    staff_loads_file = st.file_uploader("Upload Current Staff Load", type=["xlsx"])
+    st.subheader("Upload Staff Load Excel File")
 
-    if load_standard_file and staff_loads_file:
-        load_standard = pd.read_excel(load_standard_file)
-        staff_loads = pd.read_excel(staff_loads_file)
+    staff_file = st.file_uploader("Upload Staff Load File (.xlsx)", type=["xlsx"])
+
+    if staff_file:
+        staff_df = pd.read_excel(staff_file)
+        st.success("✅ File uploaded successfully")
 
         if st.button("📊 Calculate FTE"):
-            merged, fte_groups, total_university_fte = compute_fte(
-                load_standard, staff_loads
-            )
+            staff_with_fte, fte_summary, total_university_fte = compute_fte(staff_df)
 
-            st.session_state["merged"] = merged
-            st.session_state["fte_groups"] = fte_groups
+            st.session_state["staff_with_fte"] = staff_with_fte
+            st.session_state["fte_summary"] = fte_summary
             st.session_state["total_fte"] = total_university_fte
-            st.success("✅ Calculation completed!")
+            st.success("✅ FTE calculation completed!")
 
-    # --- Sub-tabs for FTE results ---
-    if "fte_groups" in st.session_state:
+    # --- Results Tabs ---
+    if "fte_summary" in st.session_state:
         sub_tab1, sub_tab2, sub_tab3 = st.tabs(
-            ["FTE Summary", "Individual Staff FTE", "Staff-to-Student Ratio"]
+            ["FTE Summary", "Individual Staff FTE", "Faculty-to-Student Ratio"]
         )
 
         with sub_tab1:
-            st.subheader("📊 FTE Group Summary")
+            st.subheader("📊 FTE Summary")
             st.dataframe(
-                st.session_state["fte_groups"].sort_values(by="FTE_Ratio"),
+                st.session_state["fte_summary"].sort_values(by="FTE"),
                 use_container_width=True,
             )
-            st.metric("✅ Total University FTE", f"{st.session_state['total_fte']:.2f}")
+            st.metric(
+                "✅ Total University FTE",
+                f"{st.session_state['total_fte']:.2f}",
+            )
 
-            fte_groups_excel = convert_df(st.session_state["fte_groups"])
+            fte_summary_excel = convert_df(st.session_state["fte_summary"])
             st.download_button(
-                "📥 Download FTE Summary (Grouped)",
-                data=fte_groups_excel,
-                file_name="fte_summary_qs.xlsx",
+                "📥 Download FTE Summary",
+                data=fte_summary_excel,
+                file_name="fte_summary.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
         with sub_tab2:
-            st.subheader("👥 Individual Staff FTE Details")
-            st.dataframe(st.session_state["merged"], use_container_width=True)
+            st.subheader("👥 Individual Staff FTE")
+            st.dataframe(
+                st.session_state["staff_with_fte"],
+                use_container_width=True,
+            )
 
-            merged_excel = convert_df(st.session_state["merged"])
+            staff_excel = convert_df(st.session_state["staff_with_fte"])
             st.download_button(
                 "📥 Download Individual Staff FTE",
-                data=merged_excel,
-                file_name="fte_individuals_qs.xlsx",
+                data=staff_excel,
+                file_name="fte_individual_staff.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 
         with sub_tab3:
-            st.subheader("📏 Staff-to-Student Ratio")
+            st.subheader("📏 Faculty-to-Student Ratio")
+
             student_number = st.number_input(
                 "Enter total number of students:",
                 min_value=1,
                 step=1,
-                key="student_number",
             )
-            fte_per_student = st.session_state["total_fte"] / student_number
-            st.metric("FTE per Student", f"{fte_per_student:.4f}")
-            st.info("This shows the average FTE per student across the university.")
+
+            ratio = st.session_state["total_fte"] / student_number
+            st.metric("Faculty-to-Student Ratio", f"{ratio:.4f}")
+
+            st.info("Ratio is calculated as: FTE University / Total Students")
 
 # --- Excel Templates Tab ---
 with tab_templates:
-    st.subheader("Excel File Column Reference Samples")
+    st.subheader("Excel Template Reference")
 
-    st.markdown("### 1️⃣ Standard Load Excel (load_standard.xlsx)")
+    st.markdown("### Required Excel Columns")
     st.write(
         pd.DataFrame(
-            columns=["FACULTYID", "JOB_TITLE_CODE", "MAX_LOAD"],
-            data=[["SampleFaculty", "Prof", 12]],
+            columns=[
+                "UniID",
+                "Name",
+                "Faculty",
+                "Contract Type",
+                "Edu Degree",
+                "load",
+                "Job Title",
+                "Max Load",
+                "Load Difference",
+            ],
+            data=[
+                [
+                    "MSA",
+                    "John Doe",
+                    "Engineering",
+                    "Full Time",
+                    "PhD",
+                    9,
+                    "Teaching Assistant",
+                    12,
+                    -3,
+                ]
+            ],
         )
     )
-    st.info("Required columns: FACULTYID, JOB_TITLE_CODE, MAX_LOAD")
 
-    st.markdown("### 2️⃣ Current Staff Load Excel (staff_loads.xlsx)")
-    st.write(
-        pd.DataFrame(
-            columns=["FACULTYID", "JOB_TITLE_CODE", "CURRENT_LOAD", "StaffName"],
-            data=[["SampleFaculty", "Prof", 10, "John Doe"]],
-        )
-    )
     st.info(
-        "Required columns: FACULTYID, JOB_TITLE_CODE, CURRENT_LOAD (StaffName optional)"
+        "Only the following columns are required for calculation:\n\n"
+        "- Contract Type\n"
+        "- load\n\n"
+        "All other columns are optional and kept for reporting."
     )
